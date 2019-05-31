@@ -16,16 +16,30 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 Using module '.\VMware.vSphereDSC.Helper.psm1'
 
-enum DatacenterFolderType {
-    Network
-    Datastore
-    VM
-    Host
-}
-
 enum Ensure {
     Absent
     Present
+}
+
+enum FolderType {
+    Network
+    Datastore
+    Vm
+    Host
+}
+
+enum LinkDiscoveryProtocolOperation {
+    Unset
+    Advertise
+    Both
+    Listen
+    None
+}
+
+enum LinkDiscoveryProtocolProtocol {
+    Unset
+    CDP
+    LLDP
 }
 
 enum LoggingLevel {
@@ -57,6 +71,29 @@ enum NicTeamingPolicy {
     Loadbalance_srcmac
     Loadbalance_srcid
     Failover_explicit
+}
+
+enum DrsAutomationLevel {
+    FullyAutomated
+    Manual
+    PartiallyAutomated
+    Disabled
+    Unset
+}
+
+enum HAIsolationResponse {
+    PowerOff
+    DoNothing
+    Shutdown
+    Unset
+}
+
+enum HARestartPriority {
+    Disabled
+    Low
+    Medium
+    High
+    Unset
 }
 
 enum BadCertificateAction {
@@ -142,11 +179,11 @@ class BaseDSC {
     }
 }
 
-class InventoryBaseDSC : BaseDSC {
+class DatacenterInventoryBaseDSC : BaseDSC {
     <#
     .DESCRIPTION
 
-    Name of the resource under the Datacenter of 'Datacenter' key property.
+    Name of the Inventory Item located in the Datacenter specified in 'DatacenterName' key property.
     #>
     [DscProperty(Key)]
     [string] $Name
@@ -154,33 +191,41 @@ class InventoryBaseDSC : BaseDSC {
     <#
     .DESCRIPTION
 
-    Inventory folder path location of the resource with name specified in 'Name' key property in
-    the Datacenter specified in the 'Datacenter' key property.
-    The path consists of 0 or more folders.
-    Empty path means the resource is in the root inventory folder.
-    The Root folders of the Datacenter are not part of the path.
-    Folder names in path are separated by "/".
-    Example path for a VM resource: "Discovered Virtual Machines/My Ubuntu VMs".
+    Location of the Inventory Item with name specified in 'Name' key property in
+    the Datacenter specified in the 'DatacenterName' key property.
+    Location consists of 0 or more Inventory Items.
+    Empty Location means that the Inventory Item is in the Root Folder of the Datacenter ('Vm', 'Host', 'Network' or 'Datastore' based on the Inventory Item).
+    The Root Folders of the Datacenter are not part of the Location.
+    Inventory Item names in Location are separated by "/".
+    Example Location for a VM Inventory Item: "Discovered Virtual Machines/My Ubuntu VMs".
     #>
     [DscProperty(Key)]
-    [string] $InventoryPath
+    [string] $Location
 
     <#
     .DESCRIPTION
 
-    The full path to the Datacenter we will use from the Inventory.
-    Root 'datacenters' folder is not part of the path. Path can't be empty.
-    Last item in the path is the Datacenter Name. If only the Datacenter Name is specified, Datacenter will be searched under the root 'datacenters' folder.
-    The parts of the path are separated with "/".
-    Example path: "MyDatacentersFolder/MyDatacenter".
+    Name of the Datacenter we will use from the specified Inventory.
     #>
     [DscProperty(Key)]
-    [string] $Datacenter
+    [string] $DatacenterName
 
     <#
     .DESCRIPTION
 
-    Value indicating if the Resource should be Present or Absent.
+    Location of the Datacenter we will use from the Inventory.
+    Root Folder of the Inventory is not part of the Location.
+    Empty Location means that the Datacenter is in the Root Folder of the Inventory.
+    Folder names in Location are separated by "/".
+    Example Location: "MyDatacentersFolder".
+    #>
+    [DscProperty(Key)]
+    [string] $DatacenterLocation
+
+    <#
+    .DESCRIPTION
+
+    Value indicating if the Inventory Item should be Present or Absent.
     #>
     [DscProperty(Mandatory)]
     [Ensure] $Ensure
@@ -188,150 +233,252 @@ class InventoryBaseDSC : BaseDSC {
     <#
     .DESCRIPTION
 
-    The type of Datacenter Folder in which the Resource is located.
+    Type of Folder in which the Inventory Item is located.
     Possible values are VM, Network, Datastore, Host.
     #>
-    hidden [DatacenterFolderType] $DatacenterFolderType
+    hidden [FolderType] $InventoryItemFolderType
 
     <#
     .DESCRIPTION
 
     Returns the Datacenter we will use from the Inventory.
     #>
-    [PSObject] GetDatacenterFromPath() {
-        if ($this.Datacenter -eq [string]::Empty) {
-            throw "You have passed an empty path which is not a valid value."
+    [PSObject] GetDatacenter() {
+        $rootFolderAsViewObject = Get-View -Server $this.Connection -Id $this.Connection.ExtensionData.Content.RootFolder
+        $rootFolder = Get-Inventory -Server $this.Connection -Id $rootFolderAsViewObject.MoRef
+
+        # Special case where the Location does not contain any folders.
+        if ($this.DatacenterLocation -eq [string]::Empty) {
+            $foundDatacenter = Get-Datacenter -Server $this.Connection -Name $this.DatacenterName -Location $rootFolder -ErrorAction SilentlyContinue | Where-Object { $_.ParentFolderId -eq $rootFolder.Id }
+            if ($null -eq $foundDatacenter) {
+                throw "Datacenter $($this.DatacenterName) was not found at $($rootFolder.Name)."
+            }
+
+            return $foundDatacenter
         }
 
-        $vCenter = $this.Connection
-        $rootFolder = Get-View -Server $this.Connection -Id $vCenter.ExtensionData.Content.RootFolder
+        # Special case where the Location is just one folder.
+        if ($this.DatacenterLocation -NotMatch '/') {
+            $foundLocation = Get-Folder -Server $this.Connection -Name $this.DatacenterLocation -Location $rootFolder -ErrorAction SilentlyContinue | Where-Object { $_.ParentId -eq $rootFolder.Id }
+            if ($null -eq $foundLocation) {
+                throw "Folder $($this.DatacenterLocation) was not found at $($rootFolder.Name)."
+            }
 
-        <#
-        This is a special case where only the Datacenter name is passed.
-        So we check if there is a Datacenter with that name at root folder.
-        #>
-        if ($this.Datacenter -NotMatch '/') {
-            $datacentersFolder = Get-Inventory -Server $this.Connection -Id $rootFolder.MoRef
-            try {
-                return Get-Datacenter -Server $this.Connection -Name $this.Datacenter -Location $datacentersFolder -ErrorAction Stop | Where-Object { $._ParentFolderId -eq $datacentersFolder.Id }
+            $foundDatacenter = Get-Datacenter -Server $this.Connection -Name $this.DatacenterName -Location $foundLocation -ErrorAction SilentlyContinue | Where-Object { $_.ParentFolderId -eq $foundLocation.Id }
+            if ($null -eq $foundDatacenter) {
+                throw "Datacenter $($this.DatacenterName) was not found at $($foundLocation.Name)."
             }
-            catch {
-                throw "Datacenter with name $($this.Datacenter) was not found at $($datacentersFolder.Name). For more inforamtion: $($_.Exception.Message)"
-            }
+
+            return $foundDatacenter
         }
 
-        $pathItems = $this.Datacenter -Split '/'
-        $datacenterName = $pathItems[$pathItems.Length - 1]
+        $locationItems = $this.DatacenterLocation -Split '/'
+        $childEntities = Get-View -Server $this.Connection -Id $rootFolder.ExtensionData.ChildEntity
+        $foundLocationItem = $null
 
-        # Removes the Datacenter name from the path items array as we already retrieved it.
-        $pathItems = $pathItems[0..($pathItems.Length - 2)]
+        for ($i = 0; $i -lt $locationItems.Length; $i++) {
+            $locationItem = $locationItems[$i]
+            $foundLocationItem = $childEntities | Where-Object -Property Name -eq $locationItem
 
-        $childEntities = Get-View -Server $this.Connection -Id $rootFolder.ChildEntity
-        $foundPathItem = $null
-
-        foreach ($pathItem in $pathItems) {
-            $foundPathItem = $childEntities | Where-Object -Property Name -eq $pathItem
-
-            if ($null -eq $foundPathItem) {
-                throw "Datacenter with path $($this.Datacenter) was not found because $pathItem folder cannot be found under."
+            if ($null -eq $foundLocationItem) {
+                throw "Datacenter $($this.DatacenterName) with Location $($this.DatacenterLocation) was not found because $locationItem folder cannot be found below $($rootFolder.Name)."
             }
 
-            # If the found path item does not have 'ChildEntity' member, the item is a Datacenter.
-            $childEntityMember = $foundPathItem | Get-Member -Name 'ChildEnity'
+            # If the found location item does not have 'ChildEntity' member, the item is a Datacenter.
+            $childEntityMember = $foundLocationItem | Get-Member -Name 'ChildEntity'
             if ($null -eq $childEntityMember) {
-                throw "The path $($this.Datacenter) contains another Datacenter $pathItem."
+                throw "The Location $($this.DatacenterLocation) contains another Datacenter $locationItem."
             }
 
-            # If the found path item is Folder and not Datacenter we start looking in the items of this Folder.
-            $childEntities = Get-View -Server $this.Connection -Id $foundPathItem.ChildEntity
+            <#
+            If the found location item is a Folder we check how many Child Entities the folder has:
+            If the Folder has zero Child Entities and the Folder is not the last location item, the Location is not valid.
+            Otherwise we start looking in the items of this Folder.
+            #>
+            if ($foundLocationItem.ChildEntity.Length -eq 0) {
+                if ($i -ne $locationItems.Length - 1) {
+                    throw "The Location $($this.DatacenterLocation) is not valid because Folder $locationItem does not have Child Entities and the Location $($this.DatacenterLocation) contains other Inventory Items."
+                }
+            }
+            else {
+                $childEntities = Get-View -Server $this.Connection -Id $foundLocationItem.ChildEntity
+            }
         }
 
-        try {
-            $datacenterLocation = Get-Inventory -Server $this.Connection -Id $foundPathItem.MoRef
-            return Get-Datacenter -Server $this.Connection -Name $datacenterName -Location $datacenterLocation -ErrorAction Stop | Where-Object { $._ParentFolderId -eq $datacenterLocation.Id }
+        $foundLocation = Get-Inventory -Server $this.Connection -Id $foundLocationItem.MoRef
+        $foundDatacenter = Get-Datacenter -Server $this.Connection -Name $this.DatacenterName -Location $foundLocation -ErrorAction SilentlyContinue | Where-Object { $_.ParentFolderId -eq $foundLocation.Id }
+
+        if ($null -eq $foundDatacenter) {
+            throw "Datacenter $($this.DatacenterName) with Location $($this.DatacenterLocation) was not found."
         }
-        catch {
-            throw "Datacenter with name $datacenterName was not found. For more inforamtion: $($_.Exception.Message)"
-        }
+
+        return $foundDatacenter
     }
 
     <#
     .DESCRIPTION
 
-    Returns the Location of the Inventory Item we will use from the specified Datacenter.
+    Returns the Location of the Inventory Item from the specified Datacenter.
     #>
-    [PSObject] GetInventoryItemLocationFromPath($foundDatacenter) {
-        $validLocation = $null
-        $datacenterFolderName = "$($this.DatacenterFolderType)Folder"
-        $datacenterFolderAsViewObject = Get-View -Server $this.Connection -Id $foundDatacenter.ExtensionData.$datacenterFolderName
+    [PSObject] GetInventoryItemLocationInDatacenter($datacenter, $datacenterFolderName) {
+        $validInventoryItemLocation = $null
+        $datacenterFolderAsViewObject = Get-View -Server $this.Connection -Id $datacenter.ExtensionData.$datacenterFolderName
         $datacenterFolder = Get-Inventory -Server $this.Connection -Id $datacenterFolderAsViewObject.MoRef
 
-        # Special case where the path does not contain any folders.
-        if ($this.InventoryPath -eq [string]::Empty) {
+        # Special case where the Location does not contain any Inventory Items.
+        if ($this.Location -eq [string]::Empty) {
             return $datacenterFolder
         }
 
-        # Special case where the path is just one folder.
-        if ($this.InventoryPath -NotMatch '/') {
-            try {
-                return Get-Inventory -Server $this.Connection -Name $this.InventoryPath -Location $datacenterFolder -ErrorAction Stop | Where-Object { $_.ParentId -eq $datacenterFolder.Id }
+        # Special case where the Location is just one Inventory Item.
+        if ($this.Location -NotMatch '/') {
+            $validInventoryItemLocation = Get-Inventory -Server $this.Connection -Name $this.Location -Location $datacenterFolder -ErrorAction SilentlyContinue | Where-Object { $_.ParentId -eq $datacenterFolder.Id }
+
+            if ($null -eq $validInventoryItemLocation) {
+                throw "Location $($this.Location) of Inventory Item $($this.Name) was not found in Folder $($datacenterFolder.Name)."
             }
-            catch {
-                throw "The provided path $($this.InventoryPath) is not a valid path in the Folder $($datacenterFolder.Name)."
-            }
+
+            return $validInventoryItemLocation
         }
 
-        $pathItems = $this.InventoryPath -Split '/'
+        $locationItems = $this.Location -Split '/'
 
-        # Reverses the path items so that we can start from the bottom and go to the top of the Inventory.
-        [array]::Reverse($pathItems)
+        # Reverses the location items so that we can start from the bottom and go to the top of the Inventory.
+        [array]::Reverse($locationItems)
 
-        $inventoryItemLocationName = $pathItems[0]
-        $locations = Get-Inventory -Server $this.Connection -Name $inventoryItemLocationName -Location $datacenterFolder
+        $datacenterInventoryItemLocationName = $locationItems[0]
+        $foundLocations = Get-Inventory -Server $this.Connection -Name $datacenterInventoryItemLocationName -Location $datacenterFolder -ErrorAction SilentlyContinue
 
-        # Removes the Inventory Item Location from the path items array as we already retrieved it.
-        $pathItems = $pathItems[1..($pathItems.Length - 1)]
+        # Removes the Name of the Inventory Item Location from the location items array as we already retrieved it.
+        $locationItems = $locationItems[1..($locationItems.Length - 1)]
 
         <#
-        For every location in the Datacenter with the specified name we start to go up through the parents to check if the path is valid.
-        If one of the Parents does not meet the criteria of the path, we continue with the next found location.
-        If we find a valid path we stop iterating through the locations and return the location which is part of the path.
+        For every found Inventory Item Location in the Datacenter with the specified name we start to go up through the parents to check if the Location is valid.
+        If one of the Parents does not meet the criteria of the Location, we continue with the next found Location.
+        If we find a valid Location we stop iterating through the Locations and return it.
         #>
-        foreach ($location in $locations) {
-            $locationAsViewObject = Get-View -Server $this.Connection -Id $location.Id -Property Parent
-            $validPath = $true
+        foreach ($foundLocation in $foundLocations) {
+            $foundLocationAsViewObject = Get-View -Server $this.Connection -Id $foundLocation.Id -Property Parent
+            $validLocation = $true
 
-            foreach ($pathItem in $pathItems) {
-                $locationAsViewObject = Get-View -Server $this.Connection -Id $locationAsViewObject.Parent -Property Name, Parent
-                if ($locationAsViewObject.Name -ne $pathItem) {
-                    $validPath = $false
+            foreach ($locationItem in $locationItems) {
+                $foundLocationAsViewObject = Get-View -Server $this.Connection -Id $foundLocationAsViewObject.Parent -Property Name, Parent
+                if ($foundLocationAsViewObject.Name -ne $locationItem) {
+                    $validLocation = $false
                     break
                 }
             }
 
-            if ($validPath) {
-                $validLocation = $location
+            if ($validLocation) {
+                $validInventoryItemLocation = $foundLocation
                 break
             }
         }
 
-        return $validLocation
+        if ($null -eq $validInventoryItemLocation) {
+            throw "Location $($this.Location) of Inventory Item $($this.Name) was not found in Datacenter $($datacenter.Name)."
+        }
+
+        return $validInventoryItemLocation
     }
 
     <#
     .DESCRIPTION
 
-    Returns the Inventory Item from the specified Datacenter if it exists, otherwise returns $null.
+    Returns the Inventory Item from the specified Location in the Datacenter if it exists, otherwise returns $null.
     #>
-    [PSObject] GetInventoryItem() {
-        $foundDatacenter = $this.GetDatacenterFromPath()
-        $inventoryItemLocation = $this.GetInventoryItemLocationFromPath($foundDatacenter)
+    [PSObject] GetInventoryItem($inventoryItemLocationInDatacenter) {
+        return Get-Inventory -Server $this.Connection -Name $this.Name -Location $inventoryItemLocationInDatacenter -ErrorAction SilentlyContinue | Where-Object { $_.ParentId -eq $inventoryItemLocationInDatacenter.Id }
+    }
+}
 
-        if ($null -eq $inventoryItemLocation) {
-            throw "The provided path $($this.InventoryPath) is not a valid path in the Datacenter $($foundDatacenter.Name)."
+class InventoryBaseDSC : BaseDSC {
+    <#
+    .DESCRIPTION
+
+    Name of the Inventory Item (Folder or Datacenter) located in the Folder specified in 'Location' key property.
+    #>
+    [DscProperty(Key)]
+    [string] $Name
+
+    <#
+    .DESCRIPTION
+
+    Location of the Inventory Item (Folder or Datacenter) we will use from the Inventory.
+    Root Folder of the Inventory is not part of the Location.
+    Empty Location means that the Inventory Item (Folder or Datacenter) is in the Root Folder of the Inventory.
+    Folder names in Location are separated by "/".
+    Example Location: "MyDatacenters".
+    #>
+    [DscProperty(Key)]
+    [string] $Location
+
+    <#
+    .DESCRIPTION
+
+    Value indicating if the Inventory Item (Folder or Datacenter) should be Present or Absent.
+    #>
+    [DscProperty(Mandatory)]
+    [Ensure] $Ensure
+
+    <#
+    .DESCRIPTION
+
+    Returns the Location of the Inventory Item (Folder or Datacenter) from the specified Inventory.
+    #>
+    [PSObject] GetInventoryItemLocation() {
+        $rootFolderAsViewObject = Get-View -Server $this.Connection -Id $this.Connection.ExtensionData.Content.RootFolder
+        $rootFolder = Get-Inventory -Server $this.Connection -Id $rootFolderAsViewObject.MoRef
+
+        # Special case where the Location does not contain any folders.
+        if ($this.Location -eq [string]::Empty) {
+            return $rootFolder
         }
 
-        return Get-Inventory -Server $this.Connection -Name $this.Name -Location $inventoryItemLocation | Where-Object { $_.ParentId -eq $inventoryItemLocation.Id }
+        # Special case where the Location is just one folder.
+        if ($this.Location -NotMatch '/') {
+            $foundLocation = Get-Inventory -Server $this.Connection -Name $this.Location -Location $rootFolder -ErrorAction SilentlyContinue | Where-Object { $_.ParentId -eq $rootFolder.Id }
+            if ($null -eq $foundLocation) {
+                throw "Folder $($this.Location) was not found at $($rootFolder.Name)."
+            }
+
+            return $foundLocation
+        }
+
+        $locationItems = $this.Location -Split '/'
+        $childEntities = Get-View -Server $this.Connection -Id $rootFolder.ExtensionData.ChildEntity
+        $foundLocationItem = $null
+
+        for ($i = 0; $i -lt $locationItems.Length; $i++) {
+            $locationItem = $locationItems[$i]
+            $foundLocationItem = $childEntities | Where-Object -Property Name -eq $locationItem
+
+            if ($null -eq $foundLocationItem) {
+                throw "Inventory Item $($this.Name) with Location $($this.Location) was not found because $locationItem folder cannot be found below $($rootFolder.Name)."
+            }
+
+            # If the found location item does not have 'ChildEntity' member, the item is a Datacenter.
+            $childEntityMember = $foundLocationItem | Get-Member -Name 'ChildEntity'
+            if ($null -eq $childEntityMember) {
+                throw "The Location $($this.Location) contains Datacenter $locationItem which is not valid."
+            }
+
+            <#
+            If the found location item is a Folder we check how many Child Entities the folder has:
+            If the Folder has zero Child Entities and the Folder is not the last location item, the Location is not valid.
+            Otherwise we start looking in the items of this Folder.
+            #>
+            if ($foundLocationItem.ChildEntity.Length -eq 0) {
+                if ($i -ne $locationItems.Length - 1) {
+                    throw "The Location $($this.Location) is not valid because Folder $locationItem does not have Child Entities and the Location $($this.Location) contains other Inventory Items."
+                }
+            }
+            else {
+                $childEntities = Get-View -Server $this.Connection -Id $foundLocationItem.ChildEntity
+            }
+        }
+
+        return Get-Inventory -Server $this.Connection -Id $foundLocationItem.MoRef
     }
 }
 
@@ -1046,6 +1193,285 @@ class vCenterStatistics : BaseDSC {
         }
         catch {
             throw "Server operation failed with the following error: $($_.Exception.Message)"
+        }
+    }
+}
+
+[DscResource()]
+class VMHostAccount : BaseDSC {
+    <#
+    .DESCRIPTION
+
+    Specifies the ID for the host account.
+    #>
+    [DscProperty(Mandatory)]
+    [string] $Id
+
+    <#
+    .DESCRIPTION
+
+    Value indicating if the Resource should be Present or Absent.
+    #>
+    [DscProperty(Mandatory)]
+    [Ensure] $Ensure
+
+    <#
+    .DESCRIPTION
+
+    Permission on the VMHost entity is created for the specified User Id with the specified Role.
+    #>
+    [DscProperty(Mandatory)]
+    [string] $Role
+
+    <#
+    .DESCRIPTION
+
+    Specifies the Password for the host account.
+    #>
+    [DscProperty()]
+    [string] $AccountPassword
+
+    <#
+    .DESCRIPTION
+
+    Provides a description for the host account. The maximum length of the text is 255 symbols.
+    #>
+    [DscProperty()]
+    [string] $Description
+
+    hidden [string] $ESXiProductId = 'embeddedEsx'
+    hidden [string] $AccountPasswordParameterName = 'Password'
+    hidden [string] $DescriptionParameterName = 'Description'
+
+    [void] Set() {
+        $this.ConnectVIServer()
+        $this.EnsureConnectionIsESXi()
+        $vmHostAccount = $this.GetVMHostAccount()
+
+        if ($this.Ensure -eq [Ensure]::Present) {
+            if ($null -eq $vmHostAccount) {
+                $this.AddVMHostAccount()
+            }
+            else {
+                $this.UpdateVMHostAccount($vmHostAccount)
+            }
+        }
+        else {
+            if ($null -ne $vmHostAccount) {
+                $this.RemoveVMHostAccount($vmHostAccount)
+            }
+        }
+    }
+
+    [bool] Test() {
+        $this.ConnectVIServer()
+        $this.EnsureConnectionIsESXi()
+        $vmHostAccount = $this.GetVMHostAccount()
+
+        if ($this.Ensure -eq [Ensure]::Present) {
+            if ($null -eq $vmHostAccount) {
+                return $false
+            }
+
+            return !$this.ShouldUpdateVMHostAccount($vmHostAccount) -or !$this.ShouldCreateAcountPermission($vmHostAccount)
+        }
+        else {
+            return ($null -eq $vmHostAccount)
+        }
+    }
+
+    [VMHostAccount] Get() {
+        $result = [VMHostAccount]::new()
+        $result.Server = $this.Server
+
+        $this.ConnectVIServer()
+        $this.EnsureConnectionIsESXi()
+        $vmHostAccount = $this.GetVMHostAccount()
+
+        $this.PopulateResult($vmHostAccount, $result)
+
+        return $result
+    }
+
+    <#
+    .DESCRIPTION
+
+    Checks if the Connection is directly to an ESXi host and if not, throws an exception.
+    #>
+    [void] EnsureConnectionIsESXi() {
+        if ($this.Connection.ProductLine -ne $this.ESXiProductId) {
+            throw 'The Resource operations are only supported when connection is directly to an ESXi host.'
+        }
+    }
+
+    <#
+    .DESCRIPTION
+
+    Returns the VMHost Account if it exists, otherwise returns $null.
+    #>
+    [PSObject] GetVMHostAccount() {
+        return Get-VMHostAccount -Server $this.Connection -Id $this.Id -ErrorAction SilentlyContinue
+    }
+
+    <#
+    .DESCRIPTION
+
+    Checks if a new Permission with the passed Role needs to be created for the specified VMHost Account.
+    #>
+    [bool] ShouldCreateAcountPermission($vmHostAccount) {
+        $existingPermission = Get-VIPermission -Server $this.Connection -Entity $this.Server -Principal $vmHostAccount -ErrorAction SilentlyContinue
+
+        return ($null -eq $existingPermission)
+    }
+
+    <#
+    .DESCRIPTION
+
+    Checks if the VMHost Account should be updated.
+    #>
+    [bool] ShouldUpdateVMHostAccount($vmHostAccount) {
+        <#
+        If the Account Password is passed, we should check if we can connect to the ESXi host with the passed Id and Password.
+        If we can connect to the host it means that the password is in the desired state so we should close the connection and
+        continue checking the other passed properties. If we cannot connect to the host it means that
+        the desired Password is not equal to the current Password of the Account.
+        #>
+        if ($null -ne $this.AccountPassword) {
+            $hostConnection = Connect-VIServer -Server $this.Server -User $this.Id -Password $this.AccountPassword -ErrorAction SilentlyContinue
+
+            if ($null -eq $hostConnection) {
+                return $true
+            }
+            else {
+                Disconnect-VIServer -Server $hostConnection -Confirm:$false
+            }
+        }
+
+        return ($null -ne $this.Description -and $this.Description -ne $vmHostAccount.Description)
+    }
+
+    <#
+    .DESCRIPTION
+
+    Populates the parameters for the New-VMHostAccount and Set-VMHostAccount cmdlets.
+    #>
+    [void] PopulateVMHostAccountParams($vmHostAccountParams, $parameter, $desiredValue) {
+        if ($null -ne $desiredValue) {
+            $vmHostAccountParams.$parameter = $desiredValue
+        }
+    }
+
+    <#
+    .DESCRIPTION
+
+    Returns the populated VMHost Account parameters.
+    #>
+    [hashtable] GetVMHostAccountParams() {
+        $vmHostAccountParams = @{}
+
+        $vmHostAccountParams.Server = $this.Connection
+        $vmHostAccountParams.Confirm = $false
+        $vmHostAccountParams.ErrorAction = 'Stop'
+
+        $this.PopulateVMHostAccountParams($vmHostAccountParams, $this.AccountPasswordParameterName, $this.AccountPassword)
+        $this.PopulateVMHostAccountParams($vmHostAccountParams, $this.DescriptionParameterName, $this.Description)
+
+        return $vmHostAccountParams
+    }
+
+    <#
+    .DESCRIPTION
+
+    Creates a new Permission with the passed Role for the specified VMHost Account.
+    #>
+    [void] CreateAccountPermission($vmHostAccount) {
+        $accountRole = Get-VIRole -Server $this.Connection -Name $this.Role -ErrorAction SilentlyContinue
+        if ($null -eq $accountRole) {
+            throw "The passed role $($this.Role) is not present on the server."
+        }
+
+        try {
+            New-VIPermission -Server $this.Connection -Entity $this.Server -Principal $vmHostAccount -Role $accountRole -ErrorAction Stop
+        }
+        catch {
+            throw "Cannot assign role $($this.Role) to account $($vmHostAccount.Name). For more information: $($_.Exception.Message)"
+        }
+    }
+
+    <#
+    .DESCRIPTION
+
+    Creates a new VMHost Account with the specified properties.
+    #>
+    [void] AddVMHostAccount() {
+        $vmHostAccountParams = $this.GetVMHostAccountParams()
+        $vmHostAccountParams.Id = $this.Id
+
+        $vmHostAccount = $null
+
+        try {
+            $vmHostAccount = New-VMHostAccount @vmHostAccountParams
+        }
+        catch {
+            throw "Cannot create VMHost Account $($this.Id). For more information: $($_.Exception.Message)"
+        }
+
+        $this.CreateAccountPermission($vmHostAccount)
+    }
+
+    <#
+    .DESCRIPTION
+
+    Updates the VMHost Account with the specified properties.
+    #>
+    [void] UpdateVMHostAccount($vmHostAccount) {
+        $vmHostAccountParams = $this.GetVMHostAccountParams()
+
+        try {
+            $vmHostAccount | Set-VMHostAccount @vmHostAccountParams
+        }
+        catch {
+            throw "Cannot update VMHost Account $($this.Id). For more information: $($_.Exception.Message)"
+        }
+
+        if ($this.ShouldCreateAcountPermission($vmHostAccount)) {
+            $this.CreateAccountPermission($vmHostAccount)
+        }
+    }
+
+    <#
+    .DESCRIPTION
+
+    Removes the VMHost Account.
+    #>
+    [void] RemoveVMHostAccount($vmHostAccount) {
+        try {
+            $vmHostAccount | Remove-VMHostAccount -Server $this.Connection -Confirm:$false -ErrorAction Stop
+        }
+        catch {
+            throw "Cannot remove VMHost Account $($this.Id). For more information: $($_.Exception.Message)"
+        }
+    }
+
+    <#
+    .DESCRIPTION
+
+    Populates the result returned from the Get() method with the values of the VMHost Account from the server.
+    #>
+    [void] PopulateResult($vmHostAccount, $result) {
+        if ($null -ne $vmHostAccount) {
+            $permission = Get-VIPermission -Server $this.Connection -Entity $this.Server -Principal $vmHostAccount -ErrorAction SilentlyContinue
+
+            $result.Id = $vmHostAccount.Id
+            $result.Ensure = [Ensure]::Present
+            $result.Role = $permission.Role
+            $result.Description = $vmHostAccount.Description
+        }
+        else {
+            $result.Id = $this.Id
+            $result.Ensure = [Ensure]::Absent
+            $result.Role = $this.Role
+            $result.Description = $this.Description
         }
     }
 }
@@ -2331,6 +2757,14 @@ class VMHostVss : VMHostVssBaseDSC {
     <#
     .DESCRIPTION
 
+    The number of ports that this virtual switch currently has.
+    #>
+    [DscProperty(NotConfigurable)]
+    [int] $NumPorts
+
+    <#
+    .DESCRIPTION
+
     The number of ports that are available on this virtual switch.
     #>
     [DscProperty(NotConfigurable)]
@@ -2473,6 +2907,192 @@ class VMHostVss : VMHostVssBaseDSC {
             $vmHostVSS.Key = [string]::Empty
             $vmHostVSS.Mtu = $this.Mtu
             $vmHostVSS.VssName = $this.VssName
+        }
+    }
+}
+
+[DscResource()]
+class VMHostVssBridge : VMHostVssBaseDSC {
+    <#
+    .DESCRIPTION
+
+    The list of keys of the physical network adapters to be bridged.
+    #>
+    [DscProperty()]
+    [string[]] $NicDevice
+
+    <#
+    .DESCRIPTION
+    The beacon configuration to probe for the validity of a link.
+    If this is set, beacon probing is configured and will be used.
+    If this is not set, beacon probing is disabled.
+    Determines how often, in seconds, a beacon should be sent.
+    #>
+    [DscProperty()]
+    [int] $BeaconInterval
+
+    <#
+    .DESCRIPTION
+
+    The link discovery protocol, whether to advertise or listen.
+    #>
+    [DscProperty()]
+    [LinkDiscoveryProtocolOperation] $LinkDiscoveryProtocolOperation = [LinkDiscoveryProtocolOperation]::Unset
+
+    <#
+    .DESCRIPTION
+
+    The link discovery protocol type.
+    #>
+    [DscProperty()]
+    [LinkDiscoveryProtocolProtocol] $LinkDiscoveryProtocolProtocol = [LinkDiscoveryProtocolProtocol]::Unset
+
+    <#
+    .DESCRIPTION
+
+    Hidden property to have the name of the VSS Bridge type for later use.
+    #>
+    hidden [string] $bridgeType = 'HostVirtualSwitchBondBridge'
+
+    [void] Set() {
+        Write-Verbose -Message "$(Get-Date) $($s = Get-PSCallStack; "Entering {0}" -f $s[0].FunctionName)"
+
+        $this.ConnectVIServer()
+        $vmHost = $this.GetVMHost()
+        $this.GetNetworkSystem($vmHost)
+
+        $this.UpdateVssBridge($vmHost)
+    }
+
+    [bool] Test() {
+        Write-Verbose -Message "$(Get-Date) $($s = Get-PSCallStack; "Entering {0}" -f $s[0].FunctionName)"
+
+        $this.ConnectVIServer()
+        $vmHost = $this.GetVMHost()
+        $this.GetNetworkSystem($vmHost)
+        $vss = $this.GetVss()
+
+        if ($this.Ensure -eq [Ensure]::Present) {
+            return ($null -ne $vss -and $this.Equals($vss))
+        }
+        else {
+            $this.NicDevice = @()
+            $this.BeaconInterval = 0
+            $this.LinkDiscoveryProtocolProtocol = [LinkDiscoveryProtocolProtocol]::Unset
+
+            return ($null -eq $vss -or $this.Equals($vss))
+        }
+    }
+
+    [VMHostVssBridge] Get() {
+        Write-Verbose -Message "$(Get-Date) $($s = Get-PSCallStack; "Entering {0}" -f $s[0].FunctionName)"
+
+        $result = [VMHostVssBridge]::new()
+        $result.Server = $this.Server
+
+        $this.ConnectVIServer()
+        $vmHost = $this.GetVMHost()
+        $this.GetNetworkSystem($vmHost)
+
+        $result.Name = $vmHost.Name
+        $this.PopulateResult($vmHost, $result)
+
+        $result.Ensure = if ([string]::Empty -ne $result.VssName) { 'Present' } else { 'Absent' }
+
+        return $result
+    }
+
+    <#
+    .DESCRIPTION
+
+    Returns a boolean value indicating if the VMHostVssBridge should to be updated.
+    #>
+    [bool] Equals($vss) {
+        Write-Verbose -Message "$(Get-Date) $($s = Get-PSCallStack; "Entering {0}" -f $s[0].FunctionName)"
+
+        $vssBridgeTest = @()
+        if ($null -eq $vss.Spec.Bridge) {
+            $vssBridgeTest += $false
+        }
+        else {
+
+            $correctType = $vss.Spec.Bridge.GetType().Name -eq $this.bridgeType
+            $vssBridgeTest += $correctType
+            if ($correctType) {
+                $comparingResult = Compare-Object -ReferenceObject $vss.Spec.Bridge.NicDevice -DifferenceObject $this.NicDevice
+                $vssBridgeTest += ($null -eq $comparingResult)
+                $vssBrdigeTest += ($vss.Spec.Bridge.Beacon.Interval -eq $this.BeaconInterval)
+                if ($this.LinkDiscoveryProtocolOperation -ne [LinkDiscoveryProtocolOperation]::Unset) {
+                    $vssBridgeTest += ($vss.Spec.Bridge.LinkDiscoveryProtocolConfig.Operation.ToString() -eq $this.LinkDiscoveryProtocolOperation.ToString())
+                }
+                if ($this.LinkDiscoveryProtocolProtocol -ne [LinkDiscoveryProtocolProtocol]::Unset) {
+                    $vssBridgeTest += ($vss.Spec.Bridge.LinkDiscoveryProtocolConfig.Protocol.ToString() -eq $this.LinkDiscoveryProtocolProtocol.ToString())
+                }
+            }
+        }
+        return ($vssBridgeTest -NotContains $false)
+    }
+
+    <#
+    .DESCRIPTION
+
+    Updates the Bridge configuration of the virtual switch.
+    #>
+    [void] UpdateVssBridge($vmHost) {
+        Write-Verbose -Message "$(Get-Date) $($s = Get-PSCallStack; "Entering {0}" -f $s[0].FunctionName)"
+
+        $vssBridgeArgs = @{
+            Name = $this.VssName
+            NicDevice = $this.NicDevice
+            BeaconInterval = $this.BeaconInterval
+        }
+        if ($this.LinkDiscoveryProtocolProtocol -ne [LinkDiscoveryProtocolProtocol]::Unset) {
+            $vssBridgeArgs.Add('LinkDiscoveryProtocolProtocol', $this.LinkDiscoveryProtocolProtocol.ToString())
+            $vssBridgeArgs.Add('LinkDiscoveryProtocolOperation', $this.LinkDiscoveryProtocolOperation.ToSTring())
+        }
+        $vss = $this.GetVss()
+
+        if ($this.Ensure -eq 'Present') {
+            if ($this.Equals($vss)) {
+                return
+            }
+        }
+        else {
+            $vssBridgeArgs.NicDevice = @()
+            $vssBridgeArgs.BeaconInterval = 0
+        }
+        $vssBridgeArgs.Add('Operation', 'edit')
+
+        try {
+            Update-Network -NetworkSystem $this.vmHostNetworkSystem -VssBridgeConfig $vssBridgeArgs -ErrorAction Stop
+        }
+        catch {
+            Write-Error "The Virtual Switch Bridge Config could not be updated: $($_.Exception.Message)"
+        }
+    }
+
+    <#
+    .DESCRIPTION
+
+    Populates the result returned from the Get() method with the values of the Bridge settings of the Virtual Switch.
+    #>
+    [void] PopulateResult($vmHost, $vmHostVSSBridge) {
+        Write-Verbose -Message "$(Get-Date) $($s = Get-PSCallStack; "Entering {0}" -f $s[0].FunctionName)"
+
+        $currentVss = $this.GetVss()
+
+        if ($null -ne $currentVss) {
+            $vmHostVSSBridge.VssName = $currentVss.Name
+            $vmHostVSSBridge.NicDevice = $currentVss.Spec.Bridge.NicDevice
+            $vmHostVSSBridge.BeaconInterval = $currentVss.Spec.Bridge.Beacon.Interval
+
+            if ($null -ne $currentVss.Spec.Bridge.linkDiscoveryProtocolConfig) {
+                $vmHostVSSBridge.LinkDiscoveryProtocolOperation = $currentVss.Spec.Bridge.LinkDiscoveryProtocolConfig.Operation.ToString()
+                $vmHostVSSBridge.LinkDiscoveryProtocolProtocol = $currentVss.Spec.Bridge.LinkDiscoveryProtocolConfig.Protocol.ToString()
+            }
+        }
+        else {
+            $vmHostVSSBridge.VssName = $this.VssName
         }
     }
 }
@@ -3003,6 +3623,608 @@ class VMHostVssTeaming : VMHostVssBaseDSC {
         }
         else {
             $vmHostVSSTeaming.VssName = $this.Name
+        }
+    }
+}
+
+[DscResource()]
+class DrsCluster : DatacenterInventoryBaseDSC {
+    DrsCluster() {
+        $this.InventoryItemFolderType = [FolderType]::Host
+    }
+
+    <#
+    .DESCRIPTION
+
+    Indicates that VMware DRS (Distributed Resource Scheduler) is enabled.
+    #>
+    [DscProperty()]
+    [nullable[bool]] $DrsEnabled
+
+    <#
+    .DESCRIPTION
+
+    Specifies a DRS (Distributed Resource Scheduler) automation level. The valid values are FullyAutomated, Manual, PartiallyAutomated, Disabled and Unset.
+    #>
+    [DscProperty()]
+    [DrsAutomationLevel] $DrsAutomationLevel = [DrsAutomationLevel]::Unset
+
+    <#
+    .DESCRIPTION
+
+    Threshold for generated ClusterRecommendations. DRS generates only those recommendations that are above the specified vmotionRate. Ratings vary from 1 to 5.
+    This setting applies to Manual, PartiallyAutomated, and FullyAutomated DRS Clusters.
+    #>
+    [DscProperty()]
+    [nullable[int]] $DrsMigrationThreshold
+
+    <#
+    .DESCRIPTION
+
+    For availability, distributes a more even number of virtual machines across hosts.
+    #>
+    [DscProperty()]
+    [nullable[int]] $DrsDistribution
+
+    <#
+    .DESCRIPTION
+
+    Load balance based on consumed memory of virtual machines rather than active memory.
+    This setting is recommended for clusters where host memory is not over-committed.
+    #>
+    [DscProperty()]
+    [nullable[int]] $MemoryLoadBalancing
+
+    <#
+    .DESCRIPTION
+
+    Controls CPU over-commitment in the cluster.
+    Min value is 0 and Max value is 500.
+    #>
+    [DscProperty()]
+    [nullable[int]] $CPUOverCommitment
+
+    hidden [string] $DrsEnabledConfigPropertyName = 'Enabled'
+    hidden [string] $DrsAutomationLevelConfigPropertyName = 'DefaultVmBehavior'
+    hidden [string] $DrsMigrationThresholdConfigPropertyName = 'VmotionRate'
+    hidden [string] $DrsDistributionSettingName = 'LimitVMsPerESXHostPercent'
+    hidden [string] $MemoryLoadBalancingSettingName = 'PercentIdleMBInMemDemand'
+    hidden [string] $CPUOverCommitmentSettingName = 'MaxVcpusPerClusterPct'
+
+    [void] Set() {
+        $this.ConnectVIServer()
+
+        $datacenter = $this.GetDatacenter()
+        $datacenterFolderName = "$($this.InventoryItemFolderType)Folder"
+        $clusterLocation = $this.GetInventoryItemLocationInDatacenter($datacenter, $datacenterFolderName)
+        $cluster = $this.GetInventoryItem($clusterLocation)
+
+        if ($this.Ensure -eq [Ensure]::Present) {
+            if ($null -eq $cluster) {
+                $this.AddCluster($clusterLocation)
+            }
+            else {
+                $this.UpdateCluster($cluster)
+            }
+        }
+        else {
+            if ($null -ne $cluster) {
+                $this.RemoveCluster($cluster)
+            }
+        }
+    }
+
+    [bool] Test() {
+        $this.ConnectVIServer()
+
+        $datacenter = $this.GetDatacenter()
+        $datacenterFolderName = "$($this.InventoryItemFolderType)Folder"
+        $clusterLocation = $this.GetInventoryItemLocationInDatacenter($datacenter, $datacenterFolderName)
+        $cluster = $this.GetInventoryItem($clusterLocation)
+
+        if ($this.Ensure -eq [Ensure]::Present) {
+            if ($null -eq $cluster) {
+                return $false
+            }
+
+            return !$this.ShouldUpdateCluster($cluster)
+        }
+        else {
+            return ($null -eq $cluster)
+        }
+    }
+
+    [DrsCluster] Get() {
+        $result = [DrsCluster]::new()
+        $result.Server = $this.Server
+        $result.Location = $this.Location
+        $result.DatacenterName = $this.DatacenterName
+        $result.DatacenterLocation = $this.DatacenterLocation
+
+        $this.ConnectVIServer()
+
+        $datacenter = $this.GetDatacenter()
+        $datacenterFolderName = "$($this.InventoryItemFolderType)Folder"
+        $clusterLocation = $this.GetInventoryItemLocationInDatacenter($datacenter, $datacenterFolderName)
+        $cluster = $this.GetInventoryItem($clusterLocation)
+
+        $this.PopulateResult($cluster, $result)
+
+        return $result
+    }
+
+    <#
+    .DESCRIPTION
+
+    Checks if the Cluster option should be updated.
+    #>
+    [bool] ShouldUpdateOptionValue($options, $key, $desiredValue) {
+        if ($null -ne $desiredValue) {
+            $currentValue = ($options | Where-Object { $_.Key -eq $key }).Value
+
+            if ($null -eq $currentValue) {
+                return $true
+            }
+            else {
+                return $desiredValue -ne $currentValue
+            }
+        }
+
+        return $false
+    }
+
+    <#
+    .DESCRIPTION
+
+    Checks if the Cluster should be updated.
+    #>
+    [bool] ShouldUpdateCluster($cluster) {
+        $drsConfig = $cluster.ExtensionData.ConfigurationEx.DrsConfig
+
+        $shouldUpdateCluster = @()
+        $shouldUpdateCluster += ($null -ne $this.DrsEnabled -and $this.DrsEnabled -ne $drsConfig.Enabled)
+        $shouldUpdateCluster += ($this.DrsAutomationLevel -ne [DrsAutomationLevel]::Unset -and $this.DrsAutomationLevel.ToString() -ne $drsConfig.DefaultVmBehavior)
+        $shouldUpdateCluster += ($null -ne $this.DrsMigrationThreshold -and $this.DrsMigrationThreshold -ne $drsConfig.VmotionRate)
+
+        if ($null -ne $drsConfig.Option) {
+            $shouldUpdateCluster += $this.ShouldUpdateOptionValue($drsConfig.Option, $this.DrsDistributionSettingName, $this.DrsDistribution)
+            $shouldUpdateCluster += $this.ShouldUpdateOptionValue($drsConfig.Option, $this.MemoryLoadBalancingSettingName, $this.MemoryLoadBalancing)
+            $shouldUpdateCluster += $this.ShouldUpdateOptionValue($drsConfig.Option, $this.CPUOverCommitmentSettingName, $this.CPUOverCommitment)
+        }
+        else {
+            $shouldUpdateCluster += ($null -ne $this.DrsDistribution -or $null -ne $this.MemoryLoadBalancing -or $null -ne $this.CPUOverCommitment)
+        }
+
+        return ($shouldUpdateCluster -Contains $true)
+    }
+
+    <#
+    .DESCRIPTION
+
+    Populates the DrsConfig property with the desired value.
+    #>
+    [void] PopulateDrsConfigProperty($drsConfig, $propertyName, $propertyValue) {
+        <#
+            Special case where the passed property value is enum type. These type of properties
+            should be populated only when their value is not equal to Unset.
+            Unset means that the property was not specified in the Configuration.
+        #>
+        if ($propertyValue -is [DrsAutomationLevel]) {
+            if ($propertyValue -ne [DrsAutomationLevel]::Unset) {
+                $drsConfig.$propertyName = $propertyValue.ToString()
+            }
+        }
+        elseif ($null -ne $propertyValue) {
+            $drsConfig.$propertyName = $propertyValue
+        }
+    }
+
+    <#
+    .DESCRIPTION
+
+    Returns the Option array for the DrsConfig with the specified options in the Configuration.
+    #>
+    [PSObject] GetOptionsForDrsConfig($allOptions) {
+        $drsConfigOptions = @()
+
+        foreach ($key in $allOptions.Keys) {
+            if ($null -ne $allOptions.$key) {
+                $option = New-Object VMware.Vim.OptionValue
+
+                $option.Key = $key
+                $option.Value = $allOptions.$key.ToString()
+
+                $drsConfigOptions += $option
+            }
+        }
+
+        return $drsConfigOptions
+    }
+
+    <#
+    .DESCRIPTION
+
+    Returns the populated Cluster Spec with the specified values in the Configuration.
+    #>
+    [PSObject] GetPopulatedClusterSpec() {
+        $clusterSpec = New-Object VMware.Vim.ClusterConfigSpecEx
+        $clusterSpec.DrsConfig = New-Object VMware.Vim.ClusterDrsConfigInfo
+
+        $this.PopulateDrsConfigProperty($clusterSpec.DrsConfig, $this.DrsEnabledConfigPropertyName, $this.DrsEnabled)
+        $this.PopulateDrsConfigProperty($clusterSpec.DrsConfig, $this.DrsAutomationLevelConfigPropertyName, $this.DrsAutomationLevel)
+        $this.PopulateDrsConfigProperty($clusterSpec.DrsConfig, $this.DrsMigrationThresholdConfigPropertyName, $this.DrsMigrationThreshold)
+
+        $allOptions = [ordered] @{
+            $this.DrsDistributionSettingName = $this.DrsDistribution
+            $this.MemoryLoadBalancingSettingName = $this.MemoryLoadBalancing
+            $this.CPUOverCommitmentSettingName = $this.CPUOverCommitment
+        }
+
+        $clusterSpec.DrsConfig.Option = $this.GetOptionsForDrsConfig($allOptions)
+
+        return $clusterSpec
+    }
+
+    <#
+    .DESCRIPTION
+
+    Creates a new Cluster with the specified properties at the specified location.
+    #>
+    [void] AddCluster($clusterLocation) {
+        $clusterSpec = $this.GetPopulatedClusterSpec()
+
+        try {
+            Add-Cluster -Folder $clusterLocation.ExtensionData -Name $this.Name -Spec $clusterSpec
+        }
+        catch {
+            throw "Server operation failed with the following error: $($_.Exception.Message)"
+        }
+    }
+
+    <#
+    .DESCRIPTION
+
+    Updates the Cluster with the specified properties.
+    #>
+    [void] UpdateCluster($cluster) {
+        $clusterSpec = $this.GetPopulatedClusterSpec()
+
+        try {
+            Update-ClusterComputeResource -ClusterComputeResource $cluster.ExtensionData -Spec $clusterSpec
+        }
+        catch {
+            throw "Server operation failed with the following error: $($_.Exception.Message)"
+        }
+    }
+
+    <#
+    .DESCRIPTION
+
+    Removes the Cluster from the specified Datacenter.
+    #>
+    [void] RemoveCluster($cluster) {
+        try {
+            Remove-ClusterComputeResource -ClusterComputeResource $cluster.ExtensionData
+        }
+        catch {
+            throw "Server operation failed with the following error: $($_.Exception.Message)"
+        }
+    }
+
+    <#
+    .DESCRIPTION
+
+    Populates the result returned from the Get() method with the values of the Cluster from the server.
+    #>
+    [void] PopulateResult($cluster, $result) {
+        if ($null -ne $cluster) {
+            $drsConfig = $cluster.ExtensionData.ConfigurationEx.DrsConfig
+
+            $result.Name = $cluster.Name
+            $result.Ensure = [Ensure]::Present
+            $result.DrsEnabled = $drsConfig.Enabled
+
+            if ($null -eq $drsConfig.DefaultVmBehavior) {
+                $result.DrsAutomationLevel = [DrsAutomationLevel]::Unset
+            }
+            else {
+                $result.DrsAutomationLevel = $drsConfig.DefaultVmBehavior.ToString()
+            }
+
+            $result.DrsMigrationThreshold = $drsConfig.VmotionRate
+
+            if ($null -ne $drsConfig.Option) {
+                $options = $drsConfig.Option
+
+                $result.DrsDistribution = ($options | Where-Object { $_.Key -eq $this.DrsDistributionSettingName }).Value
+                $result.MemoryLoadBalancing = ($options | Where-Object { $_.Key -eq $this.MemoryLoadBalancingSettingName }).Value
+                $result.CPUOverCommitment = ($options | Where-Object { $_.Key -eq $this.CPUOverCommitmentSettingName }).Value
+            }
+            else {
+                $result.DrsDistribution = $null
+                $result.MemoryLoadBalancing = $null
+                $result.CPUOverCommitment = $null
+            }
+        }
+        else {
+            $result.Name = $this.Name
+            $result.Ensure = [Ensure]::Absent
+            $result.DrsEnabled = $this.DrsEnabled
+            $result.DrsAutomationLevel = $this.DrsAutomationLevel
+            $result.DrsMigrationThreshold = $this.DrsMigrationThreshold
+            $result.DrsDistribution = $this.DrsDistribution
+            $result.MemoryLoadBalancing = $this.MemoryLoadBalancing
+            $result.CPUOverCommitment = $this.CPUOverCommitment
+        }
+    }
+}
+
+[DscResource()]
+class HACluster : DatacenterInventoryBaseDSC {
+    HACluster() {
+        $this.InventoryItemFolderType = [FolderType]::Host
+    }
+
+    <#
+    .DESCRIPTION
+
+    Indicates that VMware HA (High Availability) is enabled.
+    #>
+    [DscProperty()]
+    [nullable[bool]] $HAEnabled
+
+    <#
+    .DESCRIPTION
+
+    Indicates that virtual machines cannot be powered on if they violate availability constraints.
+    #>
+    [DscProperty()]
+    [nullable[bool]] $HAAdmissionControlEnabled
+
+    <#
+    .DESCRIPTION
+
+    Specifies a configured failover level.
+    This is the number of physical host failures that can be tolerated without impacting the ability to meet minimum thresholds for all running virtual machines.
+    The valid values range from 1 to 4.
+    #>
+    [DscProperty()]
+    [nullable[int]] $HAFailoverLevel
+
+    <#
+    .DESCRIPTION
+
+    Indicates that the virtual machine should be powered off if a host determines that it is isolated from the rest of the compute resource.
+    The valid values are PowerOff, DoNothing, Shutdown and Unset.
+    #>
+    [DscProperty()]
+    [HAIsolationResponse] $HAIsolationResponse = [HAIsolationResponse]::Unset
+
+    <#
+    .DESCRIPTION
+
+    Specifies the cluster HA restart priority. The valid values are Disabled, Low, Medium, High and Unset.
+    VMware HA is a feature that detects failed virtual machines and automatically restarts them on alternative ESX hosts.
+    #>
+    [DscProperty()]
+    [HARestartPriority] $HARestartPriority = [HARestartPriority]::Unset
+
+    hidden [string] $HAEnabledParameterName = 'HAEnabled'
+    hidden [string] $HAAdmissionControlEnabledParameterName = 'HAAdmissionControlEnabled'
+    hidden [string] $HAFailoverLevelParameterName = 'HAFailoverLevel'
+    hidden [string] $HAIsolationResponseParameterName = 'HAIsolationResponse'
+    hidden [string] $HARestartPriorityParemeterName = 'HARestartPriority'
+
+    [void] Set() {
+        $this.ConnectVIServer()
+
+        $datacenter = $this.GetDatacenter()
+        $datacenterFolderName = "$($this.InventoryItemFolderType)Folder"
+        $clusterLocation = $this.GetInventoryItemLocationInDatacenter($datacenter, $datacenterFolderName)
+        $cluster = $this.GetInventoryItem($clusterLocation)
+
+        if ($this.Ensure -eq [Ensure]::Present) {
+            if ($null -eq $cluster) {
+                $this.AddCluster($clusterLocation)
+            }
+            else {
+                $this.UpdateCluster($cluster)
+            }
+        }
+        else {
+            if ($null -ne $cluster) {
+                $this.RemoveCluster($cluster)
+            }
+        }
+    }
+
+    [bool] Test() {
+        $this.ConnectVIServer()
+
+        $datacenter = $this.GetDatacenter()
+        $datacenterFolderName = "$($this.InventoryItemFolderType)Folder"
+        $clusterLocation = $this.GetInventoryItemLocationInDatacenter($datacenter, $datacenterFolderName)
+        $cluster = $this.GetInventoryItem($clusterLocation)
+
+        if ($this.Ensure -eq [Ensure]::Present) {
+            if ($null -eq $cluster) {
+                return $false
+            }
+
+            return !$this.ShouldUpdateCluster($cluster)
+        }
+        else {
+            return ($null -eq $cluster)
+        }
+    }
+
+    [HACluster] Get() {
+        $result = [HACluster]::new()
+        $result.Server = $this.Server
+        $result.Location = $this.Location
+        $result.DatacenterName = $this.DatacenterName
+        $result.DatacenterLocation = $this.DatacenterLocation
+
+        $this.ConnectVIServer()
+
+        $datacenter = $this.GetDatacenter()
+        $datacenterFolderName = "$($this.InventoryItemFolderType)Folder"
+        $clusterLocation = $this.GetInventoryItemLocationInDatacenter($datacenter, $datacenterFolderName)
+        $cluster = $this.GetInventoryItem($clusterLocation)
+
+        $this.PopulateResult($cluster, $result)
+
+        return $result
+    }
+
+    <#
+    .DESCRIPTION
+
+    Checks if the Cluster should be updated.
+    #>
+    [bool] ShouldUpdateCluster($cluster) {
+        $shouldUpdateCluster = @()
+        $shouldUpdateCluster += ($null -ne $this.HAEnabled -and $this.HAEnabled -ne $cluster.HAEnabled)
+        $shouldUpdateCluster += ($null -ne $this.HAAdmissionControlEnabled -and $this.HAAdmissionControlEnabled -ne $cluster.HAAdmissionControlEnabled)
+        $shouldUpdateCluster += ($null -ne $this.HAFailoverLevel -and $this.HAFailoverLevel -ne $cluster.HAFailoverLevel)
+
+        if ($this.HAIsolationResponse -ne [HAIsolationResponse]::Unset) {
+            if ($null -ne $cluster.HAIsolationResponse) {
+                $shouldUpdateCluster += ($this.HAIsolationResponse.ToString() -ne $cluster.HAIsolationResponse.ToString())
+            }
+            else {
+                $shouldUpdateCluster += $true
+            }
+        }
+
+        if ($this.HARestartPriority -ne [HARestartPriority]::Unset) {
+            if ($null -ne $cluster.HARestartPriority) {
+                $shouldUpdateCluster += ($this.HARestartPriority.ToString() -ne $cluster.HARestartPriority.ToString())
+            }
+            else {
+                $shouldUpdateCluster += $true
+            }
+        }
+
+        return ($shouldUpdateCluster -Contains $true)
+    }
+
+    <#
+    .DESCRIPTION
+
+    Populates the parameters for the New-Cluster and Set-Cluster cmdlets.
+    #>
+    [void] PopulateClusterParams($clusterParams, $parameter, $desiredValue) {
+        <#
+            Special case where the desired value is enum type. These type of properties
+            should be added as parameters to the cmdlet only when their value is not equal to Unset.
+            Unset means that the property was not specified in the Configuration.
+        #>
+        if ($desiredValue -is [HAIsolationResponse] -or $desiredValue -is [HARestartPriority]) {
+            if ($desiredValue -ne 'Unset') {
+                $clusterParams.$parameter = $desiredValue.ToString()
+            }
+
+            return
+        }
+
+        if ($null -ne $desiredValue) {
+            $clusterParams.$parameter = $desiredValue
+        }
+    }
+
+    <#
+    .DESCRIPTION
+
+    Returns the populated Cluster parameters.
+    #>
+    [hashtable] GetClusterParams() {
+        $clusterParams = @{}
+
+        $clusterParams.Server = $this.Connection
+        $clusterParams.Confirm = $false
+        $clusterParams.ErrorAction = 'Stop'
+
+        $this.PopulateClusterParams($clusterParams, $this.HAEnabledParameterName, $this.HAEnabled)
+        $this.PopulateClusterParams($clusterParams, $this.HAAdmissionControlEnabledParameterName, $this.HAAdmissionControlEnabled)
+        $this.PopulateClusterParams($clusterParams, $this.HAFailoverLevelParameterName, $this.HAFailoverLevel)
+        $this.PopulateClusterParams($clusterParams, $this.HAIsolationResponseParameterName, $this.HAIsolationResponse)
+        $this.PopulateClusterParams($clusterParams, $this.HARestartPriorityParemeterName, $this.HARestartPriority)
+
+        return $clusterParams
+    }
+
+    <#
+    .DESCRIPTION
+
+    Creates a new Cluster with the specified properties at the specified location.
+    #>
+    [void] AddCluster($clusterLocation) {
+        $clusterParams = $this.GetClusterParams()
+        $clusterParams.Name = $this.Name
+        $clusterParams.Location = $clusterLocation
+
+        try {
+            New-Cluster @clusterParams
+        }
+        catch {
+            throw "Cannot create Cluster $($this.Name). For more information: $($_.Exception.Message)"
+        }
+    }
+
+    <#
+    .DESCRIPTION
+
+    Updates the Cluster with the specified properties.
+    #>
+    [void] UpdateCluster($cluster) {
+        $clusterParams = $this.GetClusterParams()
+
+        try {
+            $cluster | Set-Cluster @clusterParams
+        }
+        catch {
+            throw "Cannot update Cluster $($this.Name). For more information: $($_.Exception.Message)"
+        }
+    }
+
+    <#
+    .DESCRIPTION
+
+    Removes the Cluster from the specified Datacenter.
+    #>
+    [void] RemoveCluster($cluster) {
+        try {
+            $cluster | Remove-Cluster -Server $this.Connection -Confirm:$false -ErrorAction Stop
+        }
+        catch {
+            throw "Cannot remove Cluster $($this.Name). For more information: $($_.Exception.Message)"
+        }
+    }
+
+    <#
+    .DESCRIPTION
+
+    Populates the result returned from the Get() method with the values of the Cluster from the server.
+    #>
+    [void] PopulateResult($cluster, $result) {
+        if ($null -ne $cluster) {
+            $result.Name = $cluster.Name
+            $result.Ensure = [Ensure]::Present
+            $result.HAEnabled = $cluster.HAEnabled
+            $result.HAAdmissionControlEnabled = $cluster.HAAdmissionControlEnabled
+            $result.HAFailoverLevel = $cluster.HAFailoverLevel
+            $result.HAIsolationResponse = $cluster.HAIsolationResponse.ToString()
+            $result.HARestartPriority = $cluster.HARestartPriority.ToString()
+        }
+        else {
+            $result.Name = $this.Name
+            $result.Ensure = [Ensure]::Absent
+            $result.HAEnabled = $this.HAEnabled
+            $result.HAAdmissionControlEnabled = $this.HAAdmissionControlEnabled
+            $result.HAFailoverLevel = $this.HAFailoverLevel
+            $result.HAIsolationResponse = $this.HAIsolationResponse
+            $result.HARestartPriority = $this.HARestartPriority
         }
     }
 }

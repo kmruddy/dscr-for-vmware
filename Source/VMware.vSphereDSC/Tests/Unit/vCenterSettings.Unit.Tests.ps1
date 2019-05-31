@@ -65,10 +65,10 @@ try {
         Context 'Invoking with default resource properties' {
             BeforeAll {
                 # Arrange
-                $vCenter = [VMware.Vim.VCenter] @{ Name = '10.23.82.112'; User = 'user' }
+                $vCenter = [VMware.VimAutomation.ViCore.Impl.V1.VIServerImpl] @{ Name = '10.23.82.112'; User = 'user' }
 
                 $vCenterMock = {
-                    return [VMware.Vim.VCenter] @{ Name = '10.23.82.112'; User = 'user' }
+                    return [VMware.VimAutomation.ViCore.Impl.V1.VIServerImpl] @{ Name = '10.23.82.112'; User = 'user' }
                 }
 
                 Mock -CommandName Connect-VIServer -MockWith $vCenterMock -ModuleName $script:moduleName
@@ -111,27 +111,27 @@ try {
                 $script:resourceProperties.Issue = 'Hello World from isue!'
 
                 $advancedSettings = @(
-                    [VMware.Vim.AdvancedSetting] @{ Name = 'log.level'; Value = 'Warning' }
-                    [VMware.Vim.AdvancedSetting] @{ Name = 'event.maxAgeEnabled'; Value = $true }
-                    [VMware.Vim.AdvancedSetting] @{ Name = 'event.maxAge'; Value = 41 }
-                    [VMware.Vim.AdvancedSetting] @{ Name = 'task.maxAgeEnabled'; Value = $true }
-                    [VMware.Vim.AdvancedSetting] @{ Name = 'task.maxAge'; Value = 41 }
-                    [VMware.Vim.AdvancedSetting] @{ Name = 'etc.motd'; Value = 'Hello World from motd!' }
-                    [VMware.Vim.AdvancedSetting] @{ Name = 'etc.issue'; Value = 'Hello World from issue!' }
+                    [VMware.VimAutomation.ViCore.Impl.V1.AdvancedSettingImpl] @{ Name = 'log.level'; Value = 'Info' }
+                    [VMware.VimAutomation.ViCore.Impl.V1.AdvancedSettingImpl] @{ Name = 'event.maxAgeEnabled'; Value = $false }
+                    [VMware.VimAutomation.ViCore.Impl.V1.AdvancedSettingImpl] @{ Name = 'event.maxAge'; Value = 40 }
+                    [VMware.VimAutomation.ViCore.Impl.V1.AdvancedSettingImpl] @{ Name = 'task.maxAgeEnabled'; Value = $false }
+                    [VMware.VimAutomation.ViCore.Impl.V1.AdvancedSettingImpl] @{ Name = 'task.maxAge'; Value = 40 }
+                    [VMware.VimAutomation.ViCore.Impl.V1.AdvancedSettingImpl] @{ Name = 'etc.motd'; Value = [string]::Empty }
+                    [VMware.VimAutomation.ViCore.Impl.V1.AdvancedSettingImpl] @{ Name = 'etc.issue'; Value = [string]::Empty }
                 )
 
                 $vCenterMock = {
-                    return [VMware.Vim.VCenter] @{ Name = '10.23.82.112'; User = 'user' }
+                    return [VMware.VimAutomation.ViCore.Impl.V1.VIServerImpl] @{ Name = '10.23.82.112'; User = 'user' }
                 }
                 $advancedSettingsMock = {
                     return @(
-                        [VMware.Vim.AdvancedSetting] @{ Name = 'log.level'; Value = 'Info' }
-                        [VMware.Vim.AdvancedSetting] @{ Name = 'event.maxAgeEnabled'; Value = $false }
-                        [VMware.Vim.AdvancedSetting] @{ Name = 'event.maxAge'; Value = 40 }
-                        [VMware.Vim.AdvancedSetting] @{ Name = 'task.maxAgeEnabled'; Value = $false }
-                        [VMware.Vim.AdvancedSetting] @{ Name = 'task.maxAge'; Value = 40 }
-                        [VMware.Vim.AdvancedSetting] @{ Name = 'etc.motd'; Value = [string]::Empty }
-                        [VMware.Vim.AdvancedSetting] @{ Name = 'etc.issue'; Value = [string]::Empty }
+                        [VMware.VimAutomation.ViCore.Impl.V1.AdvancedSettingImpl] @{ Name = 'log.level'; Value = 'Info' }
+                        [VMware.VimAutomation.ViCore.Impl.V1.AdvancedSettingImpl] @{ Name = 'event.maxAgeEnabled'; Value = $false }
+                        [VMware.VimAutomation.ViCore.Impl.V1.AdvancedSettingImpl] @{ Name = 'event.maxAge'; Value = 40 }
+                        [VMware.VimAutomation.ViCore.Impl.V1.AdvancedSettingImpl] @{ Name = 'task.maxAgeEnabled'; Value = $false }
+                        [VMware.VimAutomation.ViCore.Impl.V1.AdvancedSettingImpl] @{ Name = 'task.maxAge'; Value = 40 }
+                        [VMware.VimAutomation.ViCore.Impl.V1.AdvancedSettingImpl] @{ Name = 'etc.motd'; Value = [string]::Empty }
+                        [VMware.VimAutomation.ViCore.Impl.V1.AdvancedSettingImpl] @{ Name = 'etc.issue'; Value = [string]::Empty }
                     )
                 }
 
@@ -184,27 +184,27 @@ try {
                 $script:resourceProperties.Issue = 'Hello World from issue!'
 
                 $advancedSettings = @(
-                    [VMware.Vim.AdvancedSetting] @{ Name = 'log.level'; Value = 'Warning' }
-                    [VMware.Vim.AdvancedSetting] @{ Name = 'event.maxAgeEnabled'; Value = $true }
-                    [VMware.Vim.AdvancedSetting] @{ Name = 'event.maxAge'; Value = 41 }
-                    [VMware.Vim.AdvancedSetting] @{ Name = 'task.maxAgeEnabled'; Value = $true }
-                    [VMware.Vim.AdvancedSetting] @{ Name = 'task.maxAge'; Value = 41 }
-                    [VMware.Vim.AdvancedSetting] @{ Name = 'etc.motd'; Value = 'Hello World from motd!' }
-                    [VMware.Vim.AdvancedSetting] @{ Name = 'etc.issue'; Value = 'Hello World from issue!' }
+                    [VMware.VimAutomation.ViCore.Impl.V1.AdvancedSettingImpl] @{ Name = 'log.level'; Value = 'Warning' }
+                    [VMware.VimAutomation.ViCore.Impl.V1.AdvancedSettingImpl] @{ Name = 'event.maxAgeEnabled'; Value = $true }
+                    [VMware.VimAutomation.ViCore.Impl.V1.AdvancedSettingImpl] @{ Name = 'event.maxAge'; Value = 41 }
+                    [VMware.VimAutomation.ViCore.Impl.V1.AdvancedSettingImpl] @{ Name = 'task.maxAgeEnabled'; Value = $true }
+                    [VMware.VimAutomation.ViCore.Impl.V1.AdvancedSettingImpl] @{ Name = 'task.maxAge'; Value = 41 }
+                    [VMware.VimAutomation.ViCore.Impl.V1.AdvancedSettingImpl] @{ Name = 'etc.motd'; Value = 'Hello World from motd!' }
+                    [VMware.VimAutomation.ViCore.Impl.V1.AdvancedSettingImpl] @{ Name = 'etc.issue'; Value = 'Hello World from issue!' }
                 )
 
                 $vCenterMock = {
-                    return [VMware.Vim.VCenter] @{ Name = '10.23.82.112'; User = 'user' }
+                    return [VMware.VimAutomation.ViCore.Impl.V1.VIServerImpl] @{ Name = '10.23.82.112'; User = 'user' }
                 }
                 $advancedSettingsMock = {
                     return @(
-                        [VMware.Vim.AdvancedSetting] @{ Name = 'log.level'; Value = 'Warning' }
-                        [VMware.Vim.AdvancedSetting] @{ Name = 'event.maxAgeEnabled'; Value = $true }
-                        [VMware.Vim.AdvancedSetting] @{ Name = 'event.maxAge'; Value = 41 }
-                        [VMware.Vim.AdvancedSetting] @{ Name = 'task.maxAgeEnabled'; Value = $true }
-                        [VMware.Vim.AdvancedSetting] @{ Name = 'task.maxAge'; Value = 41 }
-                        [VMware.Vim.AdvancedSetting] @{ Name = 'etc.motd'; Value = 'Hello World from motd!' }
-                        [VMware.Vim.AdvancedSetting] @{ Name = 'etc.issue'; Value = 'Hello World from issue!' }
+                        [VMware.VimAutomation.ViCore.Impl.V1.AdvancedSettingImpl] @{ Name = 'log.level'; Value = 'Warning' }
+                        [VMware.VimAutomation.ViCore.Impl.V1.AdvancedSettingImpl] @{ Name = 'event.maxAgeEnabled'; Value = $true }
+                        [VMware.VimAutomation.ViCore.Impl.V1.AdvancedSettingImpl] @{ Name = 'event.maxAge'; Value = 41 }
+                        [VMware.VimAutomation.ViCore.Impl.V1.AdvancedSettingImpl] @{ Name = 'task.maxAgeEnabled'; Value = $true }
+                        [VMware.VimAutomation.ViCore.Impl.V1.AdvancedSettingImpl] @{ Name = 'task.maxAge'; Value = 41 }
+                        [VMware.VimAutomation.ViCore.Impl.V1.AdvancedSettingImpl] @{ Name = 'etc.motd'; Value = 'Hello World from motd!' }
+                        [VMware.VimAutomation.ViCore.Impl.V1.AdvancedSettingImpl] @{ Name = 'etc.issue'; Value = 'Hello World from issue!' }
                     )
                 }
 
@@ -260,10 +260,10 @@ try {
         Context 'Invoking with default resource properties' {
             BeforeAll {
                 # Arrange
-                $vCenter = [VMware.Vim.VCenter] @{ Name = '10.23.82.112'; User = 'user' }
+                $vCenter = [VMware.VimAutomation.ViCore.Impl.V1.VIServerImpl] @{ Name = '10.23.82.112'; User = 'user' }
 
                 $vCenterMock = {
-                    return [VMware.Vim.VCenter] @{ Name = '10.23.82.112'; User = 'user' }
+                    return [VMware.VimAutomation.ViCore.Impl.V1.VIServerImpl] @{ Name = '10.23.82.112'; User = 'user' }
                 }
 
                 Mock -CommandName Connect-VIServer -MockWith $vCenterMock -ModuleName $script:moduleName
@@ -306,17 +306,17 @@ try {
                 $script:resourceProperties.Issue = 'Hello World from issue!'
 
                 $vCenterMock = {
-                    return [VMware.Vim.VCenter] @{ Name = '10.23.82.112'; User = 'user' }
+                    return [VMware.VimAutomation.ViCore.Impl.V1.VIServerImpl] @{ Name = '10.23.82.112'; User = 'user' }
                 }
                 $advancedSettingsMock = {
                     return @(
-                        [VMware.Vim.AdvancedSetting] @{ Name = 'log.level'; Value = 'Info' }
-                        [VMware.Vim.AdvancedSetting] @{ Name = 'event.maxAgeEnabled'; Value = $false }
-                        [VMware.Vim.AdvancedSetting] @{ Name = 'event.maxAge'; Value = 40 }
-                        [VMware.Vim.AdvancedSetting] @{ Name = 'task.maxAgeEnabled'; Value = $false }
-                        [VMware.Vim.AdvancedSetting] @{ Name = 'task.maxAge'; Value = 40 }
-                        [VMware.Vim.AdvancedSetting] @{ Name = 'etc.motd'; Value = [string]::Empty }
-                        [VMware.Vim.AdvancedSetting] @{ Name = 'etc.issue'; Value = [string]::Empty }
+                        [VMware.VimAutomation.ViCore.Impl.V1.AdvancedSettingImpl] @{ Name = 'log.level'; Value = 'Info' }
+                        [VMware.VimAutomation.ViCore.Impl.V1.AdvancedSettingImpl] @{ Name = 'event.maxAgeEnabled'; Value = $false }
+                        [VMware.VimAutomation.ViCore.Impl.V1.AdvancedSettingImpl] @{ Name = 'event.maxAge'; Value = 40 }
+                        [VMware.VimAutomation.ViCore.Impl.V1.AdvancedSettingImpl] @{ Name = 'task.maxAgeEnabled'; Value = $false }
+                        [VMware.VimAutomation.ViCore.Impl.V1.AdvancedSettingImpl] @{ Name = 'task.maxAge'; Value = 40 }
+                        [VMware.VimAutomation.ViCore.Impl.V1.AdvancedSettingImpl] @{ Name = 'etc.motd'; Value = [string]::Empty }
+                        [VMware.VimAutomation.ViCore.Impl.V1.AdvancedSettingImpl] @{ Name = 'etc.issue'; Value = [string]::Empty }
                     )
                 }
 
@@ -349,17 +349,17 @@ try {
                 $script:resourceProperties.Issue = 'Hello World from issue!'
 
                 $vCenterMock = {
-                    return [VMware.Vim.VCenter] @{ Name = '10.23.82.112'; User = 'user' }
+                    return [VMware.VimAutomation.ViCore.Impl.V1.VIServerImpl] @{ Name = '10.23.82.112'; User = 'user' }
                 }
                 $advancedSettingsMock = {
                     return @(
-                        [VMware.Vim.AdvancedSetting] @{ Name = 'log.level'; Value = 'Warning' }
-                        [VMware.Vim.AdvancedSetting] @{ Name = 'event.maxAgeEnabled'; Value = $true }
-                        [VMware.Vim.AdvancedSetting] @{ Name = 'event.maxAge'; Value = 41 }
-                        [VMware.Vim.AdvancedSetting] @{ Name = 'task.maxAgeEnabled'; Value = $true }
-                        [VMware.Vim.AdvancedSetting] @{ Name = 'task.maxAge'; Value = 41 }
-                        [VMware.Vim.AdvancedSetting] @{ Name = 'etc.motd'; Value = 'Hello World from motd!' }
-                        [VMware.Vim.AdvancedSetting] @{ Name = 'etc.issue'; Value = 'Hello World from issue!' }
+                        [VMware.VimAutomation.ViCore.Impl.V1.AdvancedSettingImpl] @{ Name = 'log.level'; Value = 'Warning' }
+                        [VMware.VimAutomation.ViCore.Impl.V1.AdvancedSettingImpl] @{ Name = 'event.maxAgeEnabled'; Value = $true }
+                        [VMware.VimAutomation.ViCore.Impl.V1.AdvancedSettingImpl] @{ Name = 'event.maxAge'; Value = 41 }
+                        [VMware.VimAutomation.ViCore.Impl.V1.AdvancedSettingImpl] @{ Name = 'task.maxAgeEnabled'; Value = $true }
+                        [VMware.VimAutomation.ViCore.Impl.V1.AdvancedSettingImpl] @{ Name = 'task.maxAge'; Value = 41 }
+                        [VMware.VimAutomation.ViCore.Impl.V1.AdvancedSettingImpl] @{ Name = 'etc.motd'; Value = 'Hello World from motd!' }
+                        [VMware.VimAutomation.ViCore.Impl.V1.AdvancedSettingImpl] @{ Name = 'etc.issue'; Value = 'Hello World from issue!' }
                     )
                 }
 
@@ -403,29 +403,29 @@ try {
                 $script:resourceProperties.Motd = 'Hello World from motd!'
                 $script:resourceProperties.Issue = 'Hello World from issue!'
 
-                $vCenter = [VMware.Vim.VCenter] @{ Name = '10.23.82.112'; User = 'user' }
+                $vCenter = [VMware.VimAutomation.ViCore.Impl.V1.VIServerImpl] @{ Name = '10.23.82.112'; User = 'user' }
                 $advancedSettings = @(
-                    [VMware.Vim.AdvancedSetting] @{ Name = 'log.level'; Value = 'Warning' }
-                    [VMware.Vim.AdvancedSetting] @{ Name = 'event.maxAgeEnabled'; Value = $true }
-                    [VMware.Vim.AdvancedSetting] @{ Name = 'event.maxAge'; Value = 41 }
-                    [VMware.Vim.AdvancedSetting] @{ Name = 'task.maxAgeEnabled'; Value = $true }
-                    [VMware.Vim.AdvancedSetting] @{ Name = 'task.maxAge'; Value = 41 }
-                    [VMware.Vim.AdvancedSetting] @{ Name = 'etc.motd'; Value = 'Hello World from motd!' }
-                    [VMware.Vim.AdvancedSetting] @{ Name = 'etc.issue'; Value = 'Hello World from issue!' }
+                    [VMware.VimAutomation.ViCore.Impl.V1.AdvancedSettingImpl] @{ Name = 'log.level'; Value = 'Warning' }
+                    [VMware.VimAutomation.ViCore.Impl.V1.AdvancedSettingImpl] @{ Name = 'event.maxAgeEnabled'; Value = $true }
+                    [VMware.VimAutomation.ViCore.Impl.V1.AdvancedSettingImpl] @{ Name = 'event.maxAge'; Value = 41 }
+                    [VMware.VimAutomation.ViCore.Impl.V1.AdvancedSettingImpl] @{ Name = 'task.maxAgeEnabled'; Value = $true }
+                    [VMware.VimAutomation.ViCore.Impl.V1.AdvancedSettingImpl] @{ Name = 'task.maxAge'; Value = 41 }
+                    [VMware.VimAutomation.ViCore.Impl.V1.AdvancedSettingImpl] @{ Name = 'etc.motd'; Value = 'Hello World from motd!' }
+                    [VMware.VimAutomation.ViCore.Impl.V1.AdvancedSettingImpl] @{ Name = 'etc.issue'; Value = 'Hello World from issue!' }
                 )
 
                 $vCenterMock = {
-                    return [VMware.Vim.VCenter] @{ Name = '10.23.82.112'; User = 'user' }
+                    return [VMware.VimAutomation.ViCore.Impl.V1.VIServerImpl] @{ Name = '10.23.82.112'; User = 'user' }
                 }
                 $advancedSettingsMock = {
                     return @(
-                        [VMware.Vim.AdvancedSetting] @{ Name = 'log.level'; Value = 'Warning' }
-                        [VMware.Vim.AdvancedSetting] @{ Name = 'event.maxAgeEnabled'; Value = $true }
-                        [VMware.Vim.AdvancedSetting] @{ Name = 'event.maxAge'; Value = 41 }
-                        [VMware.Vim.AdvancedSetting] @{ Name = 'task.maxAgeEnabled'; Value = $true }
-                        [VMware.Vim.AdvancedSetting] @{ Name = 'task.maxAge'; Value = 41 }
-                        [VMware.Vim.AdvancedSetting] @{ Name = 'etc.motd'; Value = 'Hello World from motd!' }
-                        [VMware.Vim.AdvancedSetting] @{ Name = 'etc.issue'; Value = 'Hello World from issue!' }
+                        [VMware.VimAutomation.ViCore.Impl.V1.AdvancedSettingImpl] @{ Name = 'log.level'; Value = 'Warning' }
+                        [VMware.VimAutomation.ViCore.Impl.V1.AdvancedSettingImpl] @{ Name = 'event.maxAgeEnabled'; Value = $true }
+                        [VMware.VimAutomation.ViCore.Impl.V1.AdvancedSettingImpl] @{ Name = 'event.maxAge'; Value = 41 }
+                        [VMware.VimAutomation.ViCore.Impl.V1.AdvancedSettingImpl] @{ Name = 'task.maxAgeEnabled'; Value = $true }
+                        [VMware.VimAutomation.ViCore.Impl.V1.AdvancedSettingImpl] @{ Name = 'task.maxAge'; Value = 41 }
+                        [VMware.VimAutomation.ViCore.Impl.V1.AdvancedSettingImpl] @{ Name = 'etc.motd'; Value = 'Hello World from motd!' }
+                        [VMware.VimAutomation.ViCore.Impl.V1.AdvancedSettingImpl] @{ Name = 'etc.issue'; Value = 'Hello World from issue!' }
                     )
                 }
 

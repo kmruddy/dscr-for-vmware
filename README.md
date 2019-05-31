@@ -14,11 +14,13 @@ The **VMware.vSphereDSC** module contains resources which are configuring:
 - **SATP Claim Rules** of VMHosts.
 - **Statistics** and **Advanced Settings** of vCenters.
 
+The Module also contains resources for Creating, Updating and Deleting **Clusters**.
+
 For more information about all available **Resources**, please visit the **wiki** page of the repository: [Wiki](https://github.com/vmware/dscr-for-vmware/wiki).
 
 ## Getting Started
 ## Requirements
-**VMware.vSphereDSC** module contains Windows PowerShell Desired State Configuration Resources.
+**VMware.vSphereDSC** module contains Microsoft PowerShell Desired State Configuration Resources.
 The following table describes the required dependencies for running VMware.vSphereDSC Resources.
 
  **Required dependency**   | **Minimum version**
@@ -52,7 +54,7 @@ To configure PowerCLI you can use the **PowerCLISettings DSC Resource** and spec
 # Example
 The following example uses [VMHostNtpSettings Resource](https://github.com/vmware/dscr-for-vmware/wiki/VMHostNtpSettings) and configures the NTP Server and the 'ntpd' Service Policy.
 
-1. You need to compile the [Configuration File](https://github.com/vmware/dscr-for-vmware/blob/master/Source/VMware.vSphereDSC/Configurations/ESXiConfigs/VMHostNtpSettings_Config.ps1) to [MOF](https://docs.microsoft.com/en-us/windows/desktop/wmisdk/managed-object-format--mof-):
+1. You need to compile the [Configuration File](https://github.com/vmware/dscr-for-vmware/blob/master/Source/VMware.vSphereDSC/Configurations/PowerShell/ESXiConfigs/VMHostNtpSettings_Config.ps1) to [MOF](https://docs.microsoft.com/en-us/windows/desktop/wmisdk/managed-object-format--mof-):
    ```
     $ntpConfigPath = Join-Path (Join-Path (Join-Path (Get-Module VMware.vSphereDSC -ListAvailable).ModuleBase 'Configurations') 'ESXiConfigs')'VMHostNtpSettings_Config.ps1'
     . $ntpConfigPath -Name '<VMHost Name>' -Server 'Server Name>' -User '<User Name>' -Password '<Password for User>'
@@ -79,18 +81,30 @@ For more information about the DSC cmdlets please visit the [PSDesiredStateConfi
 For a full list of resources in VMware.vSphereDSC and examples on their use, check out
 the [Desired State Configuration Resources for VMware wiki](https://github.com/vmware/dscr-for-vmware/wiki).
 
+Examples with Chef, Puppet and Ansible can be found [here](https://github.com/vmware/dscr-for-vmware/tree/master/Source/VMware.vSphereDSC/Configurations).
+
 ## Branches
 
 ### master
 
 [![Build Status](https://travis-ci.org/vmware/dscr-for-vmware.svg?branch=master)](https://travis-ci.org/vmware/dscr-for-vmware)
-![Coverage](https://img.shields.io/badge/coverage-88%25-yellow.svg?maxAge=60)
+![Coverage](https://img.shields.io/badge/coverage-93%25-brightgreen.svg?maxAge=60)
 
 This is the branch to which contributions should be proposed by contributors as pull requests. The content of the module releases will be from the master branch.
 
 ## Contributing
 
 The Desired State Configuration Resources for VMware project team welcomes contributions from the community. For more detailed information, refer to [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Join us on Slack
+
+If you have any questions about the project you can join us on Slack:
+
+1. Join [VMware Code](https://code.vmware.com/web/code/join)
+2. Join the following channel:
+    ```
+    powercli-dsc-contrib
+    ```
 
 ## License
 The Desired State Configuration Resources for VMware is distributed under the [BSD-2](https://github.com/vmware/dscr-for-vmware/blob/master/LICENSE.txt).

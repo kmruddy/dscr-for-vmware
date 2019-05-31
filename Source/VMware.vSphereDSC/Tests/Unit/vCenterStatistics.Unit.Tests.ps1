@@ -62,19 +62,22 @@ try {
 
         Context 'Invoking with default resource properties' {
             BeforeAll {
-                $vCenter = [VMware.Vim.VCenter] @{ Name = '10.23.82.112'; User = 'user' }
+                $vCenter = [VMware.VimAutomation.ViCore.Impl.V1.VIServerImpl] @{ Name = '10.23.82.112'; User = 'user'; ExtensionData = `
+                [VMware.Vim.ServiceInstance] @{ Content = [VMware.Vim.ServiceContent] @{ PerfManager = `
+                [VMware.Vim.ManagedObjectReference] @{ Type = 'PerformanceManager'; Value = 'PerfMgr' } } } }
                 $perfManagerMoRef = [VMware.Vim.ManagedObjectReference] @{ Type = 'PerformanceManager'; Value = 'PerfMgr' }
-                $perfManager = [VMware.Vim.PerformanceManager] @{ Id = 'PerfManager Id' }
+                $perfManager = [VMware.Vim.PerformanceManager] @{ HistoricalInterval = @([VMware.Vim.PerfInterval] @{ Key = 1; Name = 'Month'; Enabled = $false; `
+                SamplingPeriod = 600; Length = 2629800; Level = 1 }) }
                 $perfInterval = [VMware.Vim.PerfInterval] @{ Key = 1; Name = 'Month'; Enabled = $false; SamplingPeriod = 600; Length = 2629800; Level = 1 }
 
                 # Arrange
                 $vCenterMock = {
-                    return [VMware.Vim.VCenter] @{ Name = '10.23.82.112'; User = 'user'; ExtensionData = `
-                    [VMware.Vim.VCenterExtensionData] @{ Content = [VMware.Vim.ServiceContent] @{ PerfManager = `
+                    return [VMware.VimAutomation.ViCore.Impl.V1.VIServerImpl] @{ Name = '10.23.82.112'; User = 'user'; ExtensionData = `
+                    [VMware.Vim.ServiceInstance] @{ Content = [VMware.Vim.ServiceContent] @{ PerfManager = `
                     [VMware.Vim.ManagedObjectReference] @{ Type = 'PerformanceManager'; Value = 'PerfMgr' } } } }
                 }
                 $performanceManagerMock = {
-                    return [VMware.Vim.PerformanceManager] @{ Id = 'PerfManager Id'; HistoricalInterval = @([VMware.Vim.PerfInterval] @{ Key = 1; Name = 'Month'; Enabled = $false; `
+                    return [VMware.Vim.PerformanceManager] @{ HistoricalInterval = @([VMware.Vim.PerfInterval] @{ Key = 1; Name = 'Month'; Enabled = $false; `
                                                               SamplingPeriod = 600; Length = 2629800; Level = 1 }) }
                 }
                 $performanceIntervalMock = {
@@ -145,12 +148,12 @@ try {
 
                 # Arrange
                 $vCenterMock = {
-                    return [VMware.Vim.VCenter] @{ Name = '10.23.82.112'; User = 'user'; ExtensionData = `
-                    [VMware.Vim.VCenterExtensionData] @{ Content = [VMware.Vim.ServiceContent] @{ PerfManager = `
+                    return [VMware.VimAutomation.ViCore.Impl.V1.VIServerImpl] @{ Name = '10.23.82.112'; User = 'user'; ExtensionData = `
+                    [VMware.Vim.ServiceInstance] @{ Content = [VMware.Vim.ServiceContent] @{ PerfManager = `
                     [VMware.Vim.ManagedObjectReference] @{ Type = 'PerformanceManager'; Value = 'PerfMgr' } } } }
                 }
                 $performanceManagerMock = {
-                    return [VMware.Vim.PerformanceManager] @{ Id = 'PerfManager Id'; HistoricalInterval = @([VMware.Vim.PerfInterval] @{ Key = 1; Name = 'Month'; Enabled = $false; `
+                    return [VMware.Vim.PerformanceManager] @{ HistoricalInterval = @([VMware.Vim.PerfInterval] @{ Key = 1; Name = 'Month'; Enabled = $false; `
                                                               SamplingPeriod = 600; Length = 2629800; Level = 1 }) }
                 }
                 $performanceIntervalMock = {
@@ -199,18 +202,20 @@ try {
 
         Context 'Invoking with default resource properties' {
             BeforeAll {
-                $vCenter = [VMware.Vim.VCenter] @{ Name = '10.23.82.112'; User = 'user' }
+                $vCenter = [VMware.VimAutomation.ViCore.Impl.V1.VIServerImpl] @{ Name = '10.23.82.112'; User = 'user'; ExtensionData = `
+                [VMware.Vim.ServiceInstance] @{ Content = [VMware.Vim.ServiceContent] @{ PerfManager = `
+                [VMware.Vim.ManagedObjectReference] @{ Type = 'PerformanceManager'; Value = 'PerfMgr' } } } }
                 $perfManagerMoRef = [VMware.Vim.ManagedObjectReference] @{ Type = 'PerformanceManager'; Value = 'PerfMgr' }
-                $perfManager = [VMware.Vim.PerformanceManager] @{ Id = 'PerfManager Id' }
+                $perfManager = [VMware.Vim.PerformanceManager] @{}
 
                 # Arrange
                 $vCenterMock = {
-                    return [VMware.Vim.VCenter] @{ Name = '10.23.82.112'; User = 'user'; ExtensionData = `
-                    [VMware.Vim.VCenterExtensionData] @{ Content = [VMware.Vim.ServiceContent] @{ PerfManager = `
+                    return [VMware.VimAutomation.ViCore.Impl.V1.VIServerImpl] @{ Name = '10.23.82.112'; User = 'user'; ExtensionData = `
+                    [VMware.Vim.ServiceInstance] @{ Content = [VMware.Vim.ServiceContent] @{ PerfManager = `
                     [VMware.Vim.ManagedObjectReference] @{ Type = 'PerformanceManager'; Value = 'PerfMgr' } } } }
                 }
                 $performanceManagerMock = {
-                    return [VMware.Vim.PerformanceManager] @{ Id = 'PerfManager Id'; HistoricalInterval = @([VMware.Vim.PerfInterval] @{ Key = 1; Name = 'Month'; Enabled = $false; `
+                    return [VMware.Vim.PerformanceManager] @{ HistoricalInterval = @([VMware.Vim.PerfInterval] @{ Key = 1; Name = 'Month'; Enabled = $false; `
                                                               SamplingPeriod = 600; Length = 2629800; Level = 1 }) }
                 }
 
@@ -259,12 +264,12 @@ try {
 
                 # Arrange
                 $vCenterMock = {
-                    return [VMware.Vim.VCenter] @{ Name = '10.23.82.112'; User = 'user'; ExtensionData = `
-                    [VMware.Vim.VCenterExtensionData] @{ Content = [VMware.Vim.ServiceContent] @{ PerfManager = `
+                    return [VMware.VimAutomation.ViCore.Impl.V1.VIServerImpl] @{ Name = '10.23.82.112'; User = 'user'; ExtensionData = `
+                    [VMware.Vim.ServiceInstance] @{ Content = [VMware.Vim.ServiceContent] @{ PerfManager = `
                     [VMware.Vim.ManagedObjectReference] @{ Type = 'PerformanceManager'; Value = 'PerfMgr' } } } }
                 }
                 $performanceManagerMock = {
-                    return [VMware.Vim.PerformanceManager] @{ Id = 'PerfManager Id'; HistoricalInterval = @([VMware.Vim.PerfInterval] @{ Key = 1; Name = 'Month'; Enabled = $false; `
+                    return [VMware.Vim.PerformanceManager] @{ HistoricalInterval = @([VMware.Vim.PerfInterval] @{ Key = 1; Name = 'Month'; Enabled = $false; `
                                                               SamplingPeriod = 600; Length = 2629800; Level = 1 }) }
                 }
 
@@ -293,12 +298,12 @@ try {
 
                 # Arrange
                 $vCenterMock = {
-                    return [VMware.Vim.VCenter] @{ Name = '10.23.82.112'; User = 'user'; ExtensionData = `
-                    [VMware.Vim.VCenterExtensionData] @{ Content = [VMware.Vim.ServiceContent] @{ PerfManager = `
+                    return [VMware.VimAutomation.ViCore.Impl.V1.VIServerImpl] @{ Name = '10.23.82.112'; User = 'user'; ExtensionData = `
+                    [VMware.Vim.ServiceInstance] @{ Content = [VMware.Vim.ServiceContent] @{ PerfManager = `
                     [VMware.Vim.ManagedObjectReference] @{ Type = 'PerformanceManager'; Value = 'PerfMgr' } } } }
                 }
                 $performanceManagerMock = {
-                    return [VMware.Vim.PerformanceManager] @{ Id = 'PerfManager Id'; HistoricalInterval = @([VMware.Vim.PerfInterval] @{ Key = 1; Name = 'Month'; Enabled = $false; `
+                    return [VMware.Vim.PerformanceManager] @{ HistoricalInterval = @([VMware.Vim.PerfInterval] @{ Key = 1; Name = 'Month'; Enabled = $false; `
                                                               SamplingPeriod = 600; Length = 2629800; Level = 1 }) }
                 }
 
@@ -327,12 +332,12 @@ try {
 
                 # Arrange
                 $vCenterMock = {
-                    return [VMware.Vim.VCenter] @{ Name = '10.23.82.112'; User = 'user'; ExtensionData = `
-                    [VMware.Vim.VCenterExtensionData] @{ Content = [VMware.Vim.ServiceContent] @{ PerfManager = `
+                    return [VMware.VimAutomation.ViCore.Impl.V1.VIServerImpl] @{ Name = '10.23.82.112'; User = 'user'; ExtensionData = `
+                    [VMware.Vim.ServiceInstance] @{ Content = [VMware.Vim.ServiceContent] @{ PerfManager = `
                     [VMware.Vim.ManagedObjectReference] @{ Type = 'PerformanceManager'; Value = 'PerfMgr' } } } }
                 }
                 $performanceManagerMock = {
-                    return [VMware.Vim.PerformanceManager] @{ Id = 'PerfManager Id'; HistoricalInterval = @([VMware.Vim.PerfInterval] @{ Key = 1; Name = 'Month'; Enabled = $false; `
+                    return [VMware.Vim.PerformanceManager] @{ HistoricalInterval = @([VMware.Vim.PerfInterval] @{ Key = 1; Name = 'Month'; Enabled = $false; `
                                                               SamplingPeriod = 600; Length = 2629800; Level = 1 }) }
                 }
 
@@ -361,12 +366,12 @@ try {
 
                 # Arrange
                 $vCenterMock = {
-                    return [VMware.Vim.VCenter] @{ Name = '10.23.82.112'; User = 'user'; ExtensionData = `
-                    [VMware.Vim.VCenterExtensionData] @{ Content = [VMware.Vim.ServiceContent] @{ PerfManager = `
+                    return [VMware.VimAutomation.ViCore.Impl.V1.VIServerImpl] @{ Name = '10.23.82.112'; User = 'user'; ExtensionData = `
+                    [VMware.Vim.ServiceInstance] @{ Content = [VMware.Vim.ServiceContent] @{ PerfManager = `
                     [VMware.Vim.ManagedObjectReference] @{ Type = 'PerformanceManager'; Value = 'PerfMgr' } } } }
                 }
                 $performanceManagerMock = {
-                    return [VMware.Vim.PerformanceManager] @{ Id = 'PerfManager Id'; HistoricalInterval = @([VMware.Vim.PerfInterval] @{ Key = 1; Name = 'Month'; Enabled = $false; `
+                    return [VMware.Vim.PerformanceManager] @{ HistoricalInterval = @([VMware.Vim.PerfInterval] @{ Key = 1; Name = 'Month'; Enabled = $false; `
                                                               SamplingPeriod = 600; Length = 2629800; Level = 1 }) }
                 }
 
@@ -395,12 +400,12 @@ try {
 
                 # Arrange
                 $vCenterMock = {
-                    return [VMware.Vim.VCenter] @{ Name = '10.23.82.112'; User = 'user'; ExtensionData = `
-                    [VMware.Vim.VCenterExtensionData] @{ Content = [VMware.Vim.ServiceContent] @{ PerfManager = `
+                    return [VMware.VimAutomation.ViCore.Impl.V1.VIServerImpl] @{ Name = '10.23.82.112'; User = 'user'; ExtensionData = `
+                    [VMware.Vim.ServiceInstance] @{ Content = [VMware.Vim.ServiceContent] @{ PerfManager = `
                     [VMware.Vim.ManagedObjectReference] @{ Type = 'PerformanceManager'; Value = 'PerfMgr' } } } }
                 }
                 $performanceManagerMock = {
-                    return [VMware.Vim.PerformanceManager] @{ Id = 'PerfManager Id'; HistoricalInterval = @([VMware.Vim.PerfInterval] @{ Key = 1; Name = 'Month'; Enabled = $false; `
+                    return [VMware.Vim.PerformanceManager] @{ HistoricalInterval = @([VMware.Vim.PerfInterval] @{ Key = 1; Name = 'Month'; Enabled = $false; `
                                                               SamplingPeriod = 600; Length = 2629800; Level = 1 }) }
                 }
 
@@ -430,19 +435,21 @@ try {
         }
 
         BeforeAll {
-            $vCenter = [VMware.Vim.VCenter] @{ Name = '10.23.82.112'; User = 'user' }
+            $vCenter = [VMware.VimAutomation.ViCore.Impl.V1.VIServerImpl] @{ Name = '10.23.82.112'; User = 'user'; ExtensionData = `
+            [VMware.Vim.ServiceInstance] @{ Content = [VMware.Vim.ServiceContent] @{ PerfManager = `
+            [VMware.Vim.ManagedObjectReference] @{ Type = 'PerformanceManager'; Value = 'PerfMgr' } } } }
             $perfManagerMoRef = [VMware.Vim.ManagedObjectReference] @{ Type = 'PerformanceManager'; Value = 'PerfMgr' }
-            $perfManager = [VMware.Vim.PerformanceManager] @{ Id = 'PerfManager Id' }
+            $perfManager = [VMware.Vim.PerformanceManager] @{}
             $perfInterval = [VMware.Vim.PerfInterval] @{ Key = 1; Name = 'Month'; Enabled = $false; SamplingPeriod = 600; Length = 2629800; Level = 1 }
 
             # Arrange
             $vCenterMock = {
-                return [VMware.Vim.VCenter] @{ Name = '10.23.82.112'; User = 'user'; ExtensionData = `
-                [VMware.Vim.VCenterExtensionData] @{ Content = [VMware.Vim.ServiceContent] @{ PerfManager = `
+                return [VMware.VimAutomation.ViCore.Impl.V1.VIServerImpl] @{ Name = '10.23.82.112'; User = 'user'; ExtensionData = `
+                [VMware.Vim.ServiceInstance] @{ Content = [VMware.Vim.ServiceContent] @{ PerfManager = `
                 [VMware.Vim.ManagedObjectReference] @{ Type = 'PerformanceManager'; Value = 'PerfMgr' } } } }
             }
             $performanceManagerMock = {
-                return [VMware.Vim.PerformanceManager] @{ Id = 'PerfManager Id'; HistoricalInterval = @([VMware.Vim.PerfInterval] @{ Key = 1; Name = 'Month'; Enabled = $false; `
+                return [VMware.Vim.PerformanceManager] @{ HistoricalInterval = @([VMware.Vim.PerfInterval] @{ Key = 1; Name = 'Month'; Enabled = $false; `
                                                           SamplingPeriod = 600; Length = 2629800; Level = 1 }) }
             }
 
